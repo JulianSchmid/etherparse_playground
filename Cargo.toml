@@ -1,0 +1,20 @@
+[package]
+name = "playground"
+version = "0.1.0"
+authors = ["Julian Schmid <info@julianschmid.name>"]
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[[bin]]
+name = "listen"
+path = "src/listen.rs"
+
+[dependencies]
+rpcap = "0.3.0"
+byteorder = "1.2.1"
+etherparse = { path = "../etherparse" }
+pcap = { version = "0.7", features = ["tokio"] }
+tokio-core = { version = "0.1" }
+futures = "0.1.17"
