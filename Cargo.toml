@@ -11,10 +11,17 @@ path = "src/main.rs"
 name = "listen"
 path = "src/listen.rs"
 
+[[bin]]
+name = "slice"
+path = "src/slice.rs"
+
+[[bin]]
+name = "decode"
+path = "src/decode.rs"
+
 [dependencies]
 rpcap = "0.3.0"
 byteorder = "1.2.1"
 etherparse = { path = "../etherparse" }
-pcap = { version = "0.7", features = ["tokio"] }
-tokio-core = { version = "0.1" }
-futures = "0.1.17"
+pcap = { version = "0.7" }
+time = "*"

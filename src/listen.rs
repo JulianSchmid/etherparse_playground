@@ -1,9 +1,7 @@
 extern crate etherparse;
 use etherparse::*;
 extern crate pcap;
-extern crate futures;
-extern crate tokio_core;
-use std::io::Cursor;
+
 
 fn main() {
     for device in pcap::Device::list().unwrap() {
@@ -16,33 +14,91 @@ fn main() {
                   .open().unwrap();
     loop {
         while let Ok(packet) = cap.next() {
-            let mut cursor = Cursor::new(packet.data);
+            for element in PacketSlicer::ethernet2(&packet) {
+                use PacketSliceType::*;
+                match element {
+                    Ok(value) => {
+                        match value {
+                            Ethernet2Header(slice) => {
+                                println!("Ethernet2 {:?} => {:?}", slice.source(), slice.destination());
+                            },
+                            SingleVlanHeader(slice) => {
+                                println!("Vlan {:?}", slice.vlan_identifier());
+                            },
+                            DoubleVlanHeader(slice) => {
+                                println!("Double Vlan {:?}, {:?}", slice.outer().vlan_identifier(), slice.inner().vlan_identifier());
+                            },
+                            Ethernet2Payload(ether_type, _payload) => {
+                                println!("Ethernet2 unknown payload (ether_type: {:?})", ether_type);
+                            },
+                            Ipv4Header(slice) => {
+                                println!("IPv4 {:?} => {:?}", slice.source_addr(), slice.destination_addr());
+                            },
+                            Ipv6Header(slice) => {
+                                println!("IPv6 {:?} => {:?}", slice.source_addr(), slice.destination_addr());
+                            },
+                            Ipv6ExtensionHeader(header_type, _slice) => {
+                                println!("IPv6 Extension Header {:?}", header_type);
+                            },
+                            IpPayload(protocol, _payload) => {
+                                println!("IP unknown payload (id: {:?})", protocol);
+                            },
+                            UdpHeader(slice) => {
+                                println!("UDP {:?} -> {:?}", slice.source_port(), slice.destination_port());
+                            },
+                            UdpPayload(_payload) => {
 
-            //decode ethernet II framea
-            match Ethernet2Header::read(&mut cursor) {
-                Ok(eth) => {
-                    match EtherType::from_u16(eth.ether_type) {
-                        //decode ip frame
-                        Some(EtherType::Ipv4) | Some(EtherType::Ipv6) => {
-                            //decode ip message
-                            let ip_header = IpHeader::read(&mut cursor);
-                            println!("{:?}", ip_header)
-
-                            //check protocol type
-                            //todo
-                        },
-
-                        //unknown ethernet type type
-                        None => println!("unknown ethernet type({:?})", eth.ether_type),
-
-                        //other know type which we dont know how to decode
-                        ether_type => println!("{:?}", ether_type)
+                            },
+                        }
+                    },
+                    Err(value) => {
+                        println!("Err {:?}", value);
                     }
-                },
-                Err(value) => {
-                    println!("ethernetII: failed to decode => {:?}", value);
                 }
             }
+            println!();
+
+
+            /*let decoded = PacketHeaders::decode(&packet);
+            use IpHeader::*;
+            use std::net::{Ipv4Addr, Ipv6Addr};
+            match decoded {
+                Ok(value) => {
+                    match value.ethernet {
+                        Some(value) => {
+                            match EtherType::from_u16(value.ether_type) {
+                                Some(ether_type) => println!("EthernetII({:?}) {:?} => {:?}", ether_type, value.source, value.destination),
+                                None => println!("EthernetII({:?}) {:?} => {:?}", value.ether_type, value.source, value.destination)
+                            }
+                            
+                        },
+                        None => {}
+                    }
+                    match value.vlan {
+                        Some(value) => {
+                            println!("{:?}", value)
+                        },
+                        None => {}
+                    }
+                    match value.ip {
+                        Some(Version4(value)) => {
+                            println!("IPv4 {:?} => {:?}", Ipv4Addr::from(value.source), Ipv4Addr::from(value.destination));
+                        },
+                        Some(Version6(value)) => {
+                            println!("IPv6 {:?} => {:?}", Ipv6Addr::from(value.source), Ipv6Addr::from(value.destination));
+                        },
+                        _ => {}
+                    }
+                    match value.transport {
+                        Some(value) => {
+                            println!("UDP {:?} => {:?}", value.source_port, value.destination_port);
+                        },
+                        None => {}
+                    }
+                },
+                value => println!("{:?}", value)
+            }
+            println!("");*/
         }
     }
 }
