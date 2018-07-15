@@ -14,50 +14,41 @@ fn main() {
                   .open().unwrap();
     loop {
         while let Ok(packet) = cap.next() {
-            for element in PacketSlicer::ethernet2(&packet) {
-                use PacketSliceType::*;
-                match element {
-                    Ok(value) => {
-                        match value {
-                            Ethernet2Header(slice) => {
-                                println!("Ethernet2 {:?} => {:?}", slice.source(), slice.destination());
-                            },
-                            SingleVlanHeader(slice) => {
-                                println!("Vlan {:?}", slice.vlan_identifier());
-                            },
-                            DoubleVlanHeader(slice) => {
-                                println!("Double Vlan {:?}, {:?}", slice.outer().vlan_identifier(), slice.inner().vlan_identifier());
-                            },
-                            Ethernet2Payload(ether_type, _payload) => {
-                                println!("Ethernet2 unknown payload (ether_type: {:?})", ether_type);
-                            },
-                            Ipv4Header(slice) => {
-                                println!("IPv4 {:?} => {:?}", slice.source_addr(), slice.destination_addr());
-                            },
-                            Ipv6Header(slice) => {
-                                println!("IPv6 {:?} => {:?}", slice.source_addr(), slice.destination_addr());
-                            },
-                            Ipv6ExtensionHeader(header_type, _slice) => {
-                                println!("IPv6 Extension Header {:?}", header_type);
-                            },
-                            IpPayload(protocol, _payload) => {
-                                println!("IP unknown payload (id: {:?})", protocol);
-                            },
-                            UdpHeader(slice) => {
-                                println!("UDP {:?} -> {:?}", slice.source_port(), slice.destination_port());
-                            },
-                            UdpPayload(_payload) => {
 
-                            },
-                        }
-                    },
-                    Err(value) => {
-                        println!("Err {:?}", value);
+            let sliced = SlicedPacket::from_ethernet(&packet);
+
+            match sliced {
+                Err(value) => println!("Err {:?}", value),
+                Ok(value) => {
+                    println!("Ok");
+                    use LinkSlice::*;
+                    use InternetSlice::*;
+                    use TransportSlice::*;
+                    use VlanSlice::*;
+
+                    match value.link {
+                        Some(Ethernet2(value)) => println!("  Ethernet2 {:?} => {:?}", value.source(), value.destination()),
+                        None => {}
+                    }
+
+                    match value.vlan {
+                        Some(SingleVlan(value)) => println!("  SingleVlan {:?}", value.vlan_identifier()),
+                        Some(DoubleVlan(value)) => println!("  DoubleVlan {:?}, {:?}", value.outer().vlan_identifier(), value.inner().vlan_identifier()),
+                        None => {}
+                    }
+
+                    match value.ip {
+                        Some(Ipv4(value)) => println!("  Ipv4 {:?} => {:?}", value.source_addr(), value.destination_addr()),
+                        Some(Ipv6(value, _)) => println!("  Ipv6 {:?} => {:?}", value.source_addr(), value.destination_addr()),
+                        None => {}
+                    }
+
+                    match value.transport {
+                        Some(Udp(value)) => println!("  UDP {:?} -> {:?}", value.source_port(), value.destination_port()),
+                        None => {}
                     }
                 }
             }
-            println!();
-
 
             /*let decoded = PacketHeaders::decode(&packet);
             use IpHeader::*;
