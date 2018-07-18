@@ -11,19 +11,9 @@ use self::etherparse::*;
 extern crate time;
 use time::PreciseTime;
 
-fn get_size(file: &String) -> (usize, usize) {
-    
-    let mut pcapr = PcapReader::new(BufReader::new(File::open(file).unwrap())).unwrap();
-    let mut count = 0;
-    let mut memsize = 0;
-    while let Some(packet) = pcapr.next().unwrap() {
-        count += 1;
-        memsize += packet.data.len();
-    }
-    (count, memsize)
-}
+use std::io::Read;
 
-fn read(packets: &Vec<Vec<u8>>) {
+fn read<T: Read>(reader: &mut PcapReader<T>) {
     let start = PreciseTime::now();
     
     let mut ok = 0;
@@ -33,8 +23,8 @@ fn read(packets: &Vec<Vec<u8>>) {
     let mut ipv6 = 0;
     let mut ip_payload = 0;
     let mut udp = 0;
-    for packet in packets {
-        let decoded = PacketHeaders::from_ethernet_slice(&packet);
+    while let Some(packet) = reader.next().unwrap() {
+        let decoded = PacketHeaders::from_ethernet_slice(&packet.data);
         use IpHeader::*;
         match decoded {
             Ok(value) => {
@@ -70,27 +60,9 @@ fn read(packets: &Vec<Vec<u8>>) {
 }
 
 fn main() {
-        let file = env::args().nth(1).unwrap();
-
-    let (count, _) = get_size(&file);
-
-    //copy to memory
-    let mut packets = Vec::with_capacity(count);
-    {
+    let file = env::args().nth(1).unwrap();
+    for _i in 0..10 {
         let mut pcapr = PcapReader::new(BufReader::new(File::open(&file).unwrap())).unwrap();
-        while let Some(packet) = pcapr.next().unwrap() {
-            packets.push({
-                let mut buffer = Vec::with_capacity(packet.data.len());
-                buffer.extend_from_slice(packet.data);
-                buffer
-            });
-        }
+        read(&mut pcapr);
     }
-
-    println!("done copying to memory");
-    read(&packets);
-    read(&packets);
-    read(&packets);
-    read(&packets);
-    read(&packets);
 }

@@ -2,7 +2,6 @@ extern crate etherparse;
 use etherparse::*;
 extern crate pcap;
 
-
 fn main() {
     for device in pcap::Device::list().unwrap() {
         println!("{:?}", device);
@@ -47,6 +46,26 @@ fn main() {
                         Some(Udp(value)) => println!("  UDP {:?} -> {:?}", value.source_port(), value.destination_port()),
                         None => {}
                     }
+                }
+            }
+
+            match SlicedPacket::from_ethernet(&packet) {
+                Err(value) => println!("Err {:?}", value),
+                Ok(value) => {
+                    println!("link: {:?}", value.link);
+                    println!("vlan: {:?}", value.vlan);
+                    println!("ip: {:?}", value.ip);
+                    println!("transport: {:?}", value.transport);
+                }
+            }
+
+            match PacketHeaders::from_ethernet_slice(&packet) {
+                Err(value) => println!("Err {:?}", value),
+                Ok(value) => {
+                    println!("link: {:?}", value.link);
+                    println!("vlan: {:?}", value.vlan);
+                    println!("ip: {:?}", value.ip);
+                    println!("transport: {:?}", value.transport);
                 }
             }
 
