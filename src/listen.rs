@@ -44,11 +44,12 @@ fn main() {
 
                     match value.transport {
                         Some(Udp(value)) => println!("  UDP {:?} -> {:?}", value.source_port(), value.destination_port()),
+                        Some(Tcp(value)) => println!("  TCP {:?} -> {:?}", value.source_port(), value.destination_port()),
                         None => {}
                     }
                 }
             }
-
+            /*
             match SlicedPacket::from_ethernet(&packet) {
                 Err(value) => println!("Err {:?}", value),
                 Ok(value) => {
@@ -67,7 +68,7 @@ fn main() {
                     println!("ip: {:?}", value.ip);
                     println!("transport: {:?}", value.transport);
                 }
-            }
+            }*/
 
             /*let decoded = PacketHeaders::decode(&packet);
             use IpHeader::*;

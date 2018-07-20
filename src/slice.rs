@@ -22,6 +22,7 @@ fn read<T: Read>(reader: &mut PcapReader<T>) {
     let mut ipv6 = 0;
     let mut ip_payload = 0;
     let mut udp = 0;
+    let mut tcp = 0;
     while let Some(packet) = reader.next().unwrap() {
         let sliced = SlicedPacket::from_ethernet(&packet.data);
 
@@ -34,7 +35,7 @@ fn read<T: Read>(reader: &mut PcapReader<T>) {
                 use InternetSlice::*;
                 use TransportSlice::*;
 
-                match value.ip {
+                match &value.ip {
                     Some(Ipv4(_)) => {
                         ipv4 += 1;
                     },
@@ -50,6 +51,9 @@ fn read<T: Read>(reader: &mut PcapReader<T>) {
                     Some(Udp(_)) => {
                         udp += 1;
                     },
+                    Some(Tcp(_)) => {
+                        tcp += 1;
+                    },
                     None => {
                         if value.ip.is_some() {
                             ip_payload += 1;
@@ -60,8 +64,10 @@ fn read<T: Read>(reader: &mut PcapReader<T>) {
         }
     }
 
-    println!("ok={:?}, err={:?}, eth_payload={:?}, ipv4={:?}, ipv6={:?}, ip_payload={:?}, udp={:?}", ok, err, eth_payload, ipv4, ipv6, ip_payload, udp);
-    println!("done reading in {:?}", start.to(PreciseTime::now()));
+    let duration = start.to(PreciseTime::now());
+
+    println!("ok={:?}, err={:?}, eth_payload={:?}, ipv4={:?}, ipv6={:?}, ip_payload={:?}, udp={:?}, tcp={:?}", ok, err, eth_payload, ipv4, ipv6, ip_payload, udp, tcp);
+    println!("done reading in {}", duration);
 }
 
 fn main() {
