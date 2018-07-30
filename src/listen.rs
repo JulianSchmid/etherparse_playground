@@ -44,7 +44,11 @@ fn main() {
 
                     match value.transport {
                         Some(Udp(value)) => println!("  UDP {:?} -> {:?}", value.source_port(), value.destination_port()),
-                        Some(Tcp(value)) => println!("  TCP {:?} -> {:?}", value.source_port(), value.destination_port()),
+                        Some(Tcp(value)) => {
+                            println!("  TCP {:?} -> {:?}", value.source_port(), value.destination_port());
+                            let options: Vec<Result<TcpOptionElement, TcpOptionReadError>> = value.options_iterator().collect();
+                            println!("    {:?}", options);
+                        }
                         None => {}
                     }
                 }

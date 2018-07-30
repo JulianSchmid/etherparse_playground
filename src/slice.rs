@@ -1,5 +1,5 @@
-use std::io::BufReader;
-use std::fs::File;
+use std::io::{Write,BufReader};
+use std::fs::{File, Metadata};
 use std::env;
 extern crate rpcap;
 use self::rpcap::read::PcapReader;
@@ -7,56 +7,86 @@ use self::rpcap::read::PcapReader;
 extern crate etherparse;
 use self::etherparse::*;
 
-use std::io::Read;
-
 extern crate time;
 use time::PreciseTime;
 
-fn read<T: Read>(reader: &mut PcapReader<T>) {
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+struct Stats {
+    total_payload_size: usize,
+    ok: usize,
+    err: usize,
+    eth_payload: usize,
+    ipv4: usize,
+    ipv6: usize,
+    ip_payload: usize,
+    udp: usize,
+    tcp: usize,
+    tcp_options_err: usize,
+    tcp_options_nop: usize,
+    tcp_options_max_seg: usize,
+    tcp_options_window_scale: usize,
+    tcp_options_selec_ack_perm: usize,
+    tcp_options_selec_ack: usize,
+    tcp_options_timestamp: usize
+}
+
+use TcpOptionElement::*;
+
+fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Write) {
     let start = PreciseTime::now();
 
-    let mut ok = 0;
-    let mut err = 0;
-    let mut eth_payload = 0;
-    let mut ipv4 = 0;
-    let mut ipv6 = 0;
-    let mut ip_payload = 0;
-    let mut udp = 0;
-    let mut tcp = 0;
+    let mut reader = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
+
+    let mut stats: Stats = Default::default();
+
     while let Some(packet) = reader.next().unwrap() {
+        stats.total_payload_size += packet.data.len();
+
         let sliced = SlicedPacket::from_ethernet(&packet.data);
 
         match sliced {
             Err(_) => {
-                err += 1;
+                stats.err += 1;
             },
             Ok(value) => {
-                ok += 1;
+                stats.ok += 1;
                 use InternetSlice::*;
                 use TransportSlice::*;
 
                 match &value.ip {
                     Some(Ipv4(_)) => {
-                        ipv4 += 1;
+                        stats.ipv4 += 1;
                     },
                     Some(Ipv6(_,_)) => {
-                        ipv6 += 1;
+                        stats.ipv6 += 1;
                     },
                     None => {
-                        eth_payload += 1;
+                        stats.eth_payload += 1;
                     }
                 }
 
                 match value.transport {
                     Some(Udp(_)) => {
-                        udp += 1;
+                        stats.udp += 1;
                     },
-                    Some(Tcp(_)) => {
-                        tcp += 1;
+                    Some(Tcp(tcp)) => {
+                        stats.tcp += 1;
+                        for option in tcp.options_iterator() {
+                            match option {
+                                Err(_) => stats.tcp_options_err += 1,
+                                Ok(Nop) => stats.tcp_options_nop += 1,
+                                Ok(MaximumSegmentSize(_)) => stats.tcp_options_max_seg += 1,
+                                Ok(WindowScale(_)) => stats.tcp_options_window_scale += 1,
+                                Ok(SelectiveAcknowledgementPermitted) => stats.tcp_options_selec_ack_perm += 1,
+                                Ok(SelectiveAcknowledgement(_,_)) => stats.tcp_options_selec_ack += 1,
+                                Ok(Timestamp(_, _)) => stats.tcp_options_timestamp += 1
+                            }
+                        }
                     },
                     None => {
                         if value.ip.is_some() {
-                            ip_payload += 1;
+                            stats.ip_payload += 1;
                         }
                     }
                 }
@@ -64,17 +94,28 @@ fn read<T: Read>(reader: &mut PcapReader<T>) {
         }
     }
 
-    let duration = start.to(PreciseTime::now());
+    let duration = start.to(PreciseTime::now()).to_std().unwrap();
+    let duration_secs = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+    //let gigabits_per_sec = in_file_metadata.len() as f64 / duration_secs / 125_000_000.0;
+    let gigabytes_per_sec = in_file_metadata.len() as f64 / duration_secs /  1_000_000_000.0;
+    //let gigabits_per_sec_payload = stats.total_payload_size as f64 / duration_secs / 125_000_000.0;
+    let gigabytes_per_sec_payload = stats.total_payload_size as f64 / duration_secs / 1_000_000_000.0;
 
-    println!("ok={:?}, err={:?}, eth_payload={:?}, ipv4={:?}, ipv6={:?}, ip_payload={:?}, udp={:?}, tcp={:?}", ok, err, eth_payload, ipv4, ipv6, ip_payload, udp, tcp);
-    println!("done reading in {}", duration);
+    println!("{:?}", stats);
+    println!("{:?}", duration);
+    println!("{:?}GB/s (file)", gigabytes_per_sec);
+    println!("{:?}GB/s (payload)", gigabytes_per_sec_payload);
+    
+    writeln!(result_writer, "{},{},{},{},{}", duration_secs, in_file_metadata.len(), stats.total_payload_size, gigabytes_per_sec, gigabytes_per_sec_payload).unwrap();
 }
 
 fn main() {
+    let in_file_path = env::args().nth(1).unwrap();
+    let mut out_file = File::create(&env::args().nth(2).unwrap()).unwrap();
 
-    let file = env::args().nth(1).unwrap();
-    for _i in 0..10 {
-        let mut pcapr = PcapReader::new(BufReader::new(File::open(&file).unwrap())).unwrap();
-        read(&mut pcapr);
+    for _i in 0..100 {
+        let in_file_metadata = std::fs::metadata(&in_file_path).unwrap();
+        //let mut pcapr = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
+        read(&in_file_path, in_file_metadata, &mut out_file);
     }
 }

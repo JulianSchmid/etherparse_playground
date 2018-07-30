@@ -19,9 +19,17 @@ path = "src/slice.rs"
 name = "decode"
 path = "src/decode.rs"
 
+[[bin]]
+name = "calc_csv_stats"
+path = "src/calc_csv_stats.rs"
+
 [dependencies]
 rpcap = "0.3.0"
 byteorder = "1.2.1"
 etherparse = { path = "../etherparse" }
 pcap = { version = "0.7" }
 time = "*"
+clap = "2.32.0"
+csv = "1"
+serde = "1.0.70"
+serde_derive = "1.0.70"
