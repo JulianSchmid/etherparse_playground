@@ -1,4 +1,4 @@
-use std::io::{Write,BufReader};
+use std::io::BufReader;
 use std::fs::{File, Metadata};
 use std::env;
 extern crate rpcap;
@@ -9,6 +9,15 @@ use self::etherparse::*;
 
 extern crate time;
 use time::PreciseTime;
+
+extern crate glob;
+use glob::glob;
+
+extern crate csv;
+use csv::Writer;
+
+#[macro_use]
+extern crate serde_derive;
 
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -31,9 +40,19 @@ struct Stats {
     tcp_options_timestamp: usize
 }
 
+#[derive(Serialize)]
+struct ResultStats<'a> {
+    path: &'a str,
+    duration_secs: f64,
+    file_size: u64,
+    total_packets_size: usize,
+    gigabytes_per_sec_file: f64,
+    gigabytes_per_sec_packets: f64
+}
+
 use TcpOptionElement::*;
 
-fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Write) {
+fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writer<File>) {
     let start = PreciseTime::now();
 
     let mut reader = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
@@ -97,25 +116,48 @@ fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writ
     let duration = start.to(PreciseTime::now()).to_std().unwrap();
     let duration_secs = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
     //let gigabits_per_sec = in_file_metadata.len() as f64 / duration_secs / 125_000_000.0;
-    let gigabytes_per_sec = in_file_metadata.len() as f64 / duration_secs /  1_000_000_000.0;
+    let gigabytes_per_sec_file = in_file_metadata.len() as f64 / duration_secs /  1_000_000_000.0;
     //let gigabits_per_sec_payload = stats.total_payload_size as f64 / duration_secs / 125_000_000.0;
-    let gigabytes_per_sec_payload = stats.total_payload_size as f64 / duration_secs / 1_000_000_000.0;
+    let gigabytes_per_sec_packets = stats.total_payload_size as f64 / duration_secs / 1_000_000_000.0;
 
+    println!("{}", in_file_path);
     println!("{:?}", stats);
     println!("{:?}", duration);
-    println!("{:?}GB/s (file)", gigabytes_per_sec);
-    println!("{:?}GB/s (payload)", gigabytes_per_sec_payload);
+    println!("{:?}GB/s (file)", gigabytes_per_sec_file);
+    println!("{:?}GB/s (packets data)", gigabytes_per_sec_packets);
+
+    result_writer.serialize(ResultStats {
+        path: in_file_path,
+        duration_secs: duration_secs,
+        file_size: in_file_metadata.len(),
+        total_packets_size: stats.total_payload_size,
+        gigabytes_per_sec_file: gigabytes_per_sec_file,
+        gigabytes_per_sec_packets: gigabytes_per_sec_packets
+    }).unwrap();
     
-    writeln!(result_writer, "{},{},{},{},{}", duration_secs, in_file_metadata.len(), stats.total_payload_size, gigabytes_per_sec, gigabytes_per_sec_payload).unwrap();
+    //writeln!(result_writer, "{},{},{},{},{}", duration_secs, in_file_metadata.len(), stats.total_payload_size, gigabytes_per_sec, gigabytes_per_sec_payload).unwrap();
 }
 
 fn main() {
     let in_file_path = env::args().nth(1).unwrap();
-    let mut out_file = File::create(&env::args().nth(2).unwrap()).unwrap();
+    let mut out_file = Writer::from_path(&env::args().nth(2).unwrap()).unwrap();
 
+    for entry in glob(&in_file_path).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                let path_str = path.to_str().unwrap();
+                let in_file_metadata = std::fs::metadata(&path_str).unwrap();
+                //let mut pcapr = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
+                read(&path_str, in_file_metadata, &mut out_file);
+            },
+            Err(e) => println!("{:?}", e),
+        }
+    }
+
+    /*
     for _i in 0..100 {
         let in_file_metadata = std::fs::metadata(&in_file_path).unwrap();
         //let mut pcapr = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
         read(&in_file_path, in_file_metadata, &mut out_file);
-    }
+    }*/
 }
