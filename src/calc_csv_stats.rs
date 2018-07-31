@@ -7,20 +7,32 @@ use clap::{Arg, App};
 
 #[derive(Debug, Default, Clone)]
 struct Stats {
-    average: f64,
-    standard_deviation: f64
+    average: Option<f64>,
+    standard_deviation: Option<f64>,
+    sum: f64,
+    count: usize
 }
 
 impl Stats {
 
     fn from_slice(values: &[f64]) -> Stats {
-        //1st pass: calculate average
-        let average: f64 = values.iter().sum::<f64>() / (values.len() as f64);
+        let sum = values.iter().sum::<f64>();
+        let average: f64 = if values.len() > 0 {
+            sum / (values.len() as f64)
+        }  else {
+            0.0
+        };
         let sum2: f64 = values.iter().fold(0.0, |acc, x| (x - average)*(x - average) + acc);
 
         Stats {
-            average: average,
-            standard_deviation: (sum2 / ((values.len() - 1) as f64)).sqrt()
+            average: Some(average),
+            standard_deviation: if values.len() > 1 {
+                Some((sum2 / ((values.len() - 1) as f64)).sqrt())
+            } else {
+                None
+            },
+            sum: sum,
+            count: values.len()
         }
     }
 }
@@ -63,7 +75,12 @@ fn main() {
         let mut rdr = csv::Reader::from_reader(BufReader::new(File::open(&matches.value_of("INPUT").unwrap()).unwrap()));
         for record in rdr.records() {
             for (value, v) in record.unwrap().iter().zip(values.iter_mut()) {
-                v.push(value.parse::<f64>().unwrap());
+                match value.parse::<f64>() {
+                    Ok(value) => {
+                        v.push(value);
+                    },
+                    Err(_) => {}
+                }
             }
         }
     }
