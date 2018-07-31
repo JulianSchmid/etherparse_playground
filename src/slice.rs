@@ -50,16 +50,35 @@ struct ResultStats<'a> {
     gigabytes_per_sec_packets: f64
 }
 
+#[derive(Debug)]
+enum Error {
+    IoError(std::io::Error),
+    PcapError(rpcap::PcapError),
+
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::IoError(err)
+    }
+}
+
+impl From<rpcap::PcapError> for Error {
+    fn from(err: rpcap::PcapError) -> Error {
+        Error::PcapError(err)
+    }
+}
+
 use TcpOptionElement::*;
 
-fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writer<File>) {
+fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writer<File>) -> Result<(),Error> {
     let start = PreciseTime::now();
 
-    let mut reader = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
+    let mut reader = PcapReader::new(BufReader::new(File::open(&in_file_path)?))?;
 
     let mut stats: Stats = Default::default();
 
-    while let Some(packet) = reader.next().unwrap() {
+    while let Some(packet) = reader.next()? {
         stats.total_payload_size += packet.data.len();
 
         let sliced = SlicedPacket::from_ethernet(&packet.data);
@@ -135,6 +154,7 @@ fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writ
         gigabytes_per_sec_packets: gigabytes_per_sec_packets
     }).unwrap();
     
+    Ok(())
     //writeln!(result_writer, "{},{},{},{},{}", duration_secs, in_file_metadata.len(), stats.total_payload_size, gigabytes_per_sec, gigabytes_per_sec_payload).unwrap();
 }
 
@@ -148,7 +168,10 @@ fn main() {
                 let path_str = path.to_str().unwrap();
                 let in_file_metadata = std::fs::metadata(&path_str).unwrap();
                 //let mut pcapr = PcapReader::new(BufReader::new(File::open(&in_file_path).unwrap())).unwrap();
-                read(&path_str, in_file_metadata, &mut out_file);
+                match read(&path_str, in_file_metadata, &mut out_file) {
+                    Ok(_) => {},
+                    Err(err) => println!("{:?}", err)
+                }
             },
             Err(e) => println!("{:?}", e),
         }
