@@ -33,7 +33,7 @@ fn main() {
                 Ok(value) => {
 
                     if !filter.applies_to_slice(&value) {
-                        continue;
+                        //continue;
                     }
 
                     println!("Ok");

@@ -3,33 +3,29 @@ use std::fs::File;
 extern crate etherparse_playground;
 use self::etherparse_playground::*;
 extern crate rpcap;
-use self::rpcap::read::PcapReader;
 extern crate etherparse;
 use self::etherparse::*;
 extern crate glob;
-use glob::glob;
 extern crate csv;
-use csv::Writer;
 #[macro_use]
 extern crate clap;
 use clap::{Arg, App};
-use TcpOptionElement::*;
 
-fn read(in_file_path: &str, result_writer: &mut Writer<File>) -> Result<(),Error> {
+fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),Error> {
     
     let mut recorder = StatsRecorder::new(in_file_path);
     {
         let stats = &mut recorder.stats;
-        let mut reader = PcapReader::new(BufReader::new(File::open(&in_file_path)?))?;
+        let mut reader = rpcap::read::PcapReader::new(BufReader::new(File::open(&in_file_path)?))?;
 
         while let Some(packet) = reader.next()? {            
             stats.total_payload_size += packet.data.len();
 
-            let decoded = PacketHeaders::from_ethernet_slice(&packet.data);
-            use IpHeader::*;
-            use TransportHeader::*;
-            match decoded {
+            match PacketHeaders::from_ethernet_slice(&packet.data) {
                 Ok(value) => {
+                    use IpHeader::*;
+                    use TransportHeader::*;
+
                     stats.ok += 1;
                     match value.ip {
                         Some(Version4(_value)) => {
@@ -48,6 +44,8 @@ fn read(in_file_path: &str, result_writer: &mut Writer<File>) -> Result<(),Error
                         },
                         Some(Tcp(tcp)) => {
                             stats.tcp += 1;
+
+                            use TcpOptionElement::*;
                             for option in tcp.options_iterator() {
                                 match option {
                                     Err(_) => stats.tcp_options_err += 1,
@@ -96,9 +94,9 @@ fn main() {
 
     let number_of_reads = value_t_or_exit!(matches, "number_of_reads", usize);
 
-    let mut out_file = Writer::from_path(&matches.value_of("csv").unwrap()).unwrap();
+    let mut out_file = csv::Writer::from_path(&matches.value_of("csv").unwrap()).unwrap();
 
-    for entry in glob(&matches.value_of("INPUT").unwrap()).expect("Failed to read glob pattern") {
+    for entry in glob::glob(&matches.value_of("INPUT").unwrap()).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let path_str = path.to_str().unwrap();
