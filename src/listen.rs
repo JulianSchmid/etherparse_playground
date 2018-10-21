@@ -1,5 +1,6 @@
 extern crate etherparse;
 use etherparse::*;
+use etherparse::packet_filter::*;
 extern crate pcap;
 
 fn main() {

@@ -6,6 +6,7 @@ use self::rpcap::read::PcapReader;
 
 extern crate etherparse;
 use self::etherparse::*;
+use self::etherparse::packet_filter::*;
 
 extern crate time;
 use time::PreciseTime;
