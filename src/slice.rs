@@ -78,6 +78,17 @@ fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writ
 
     let mut stats: Stats = Default::default();
 
+    let filter = Filter {
+        link: ElementFilter::Any,
+        vlan: ElementFilter::No,
+        ip: ElementFilter::Some(IpFilter::Ipv4{
+            source: Some([10,0,0,2]),
+            destination: None
+        }),
+        transport: ElementFilter::Any, //<TransportFilter>
+    };
+    let mut filter_matching = 0;
+
     while let Some(packet) = reader.next()? {
         stats.total_payload_size += packet.data.len();
 
@@ -88,6 +99,9 @@ fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writ
                 stats.err += 1;
             },
             Ok(value) => {
+                if filter.applies_to_slice(&value) {
+                    filter_matching += 1;
+                }
                 stats.ok += 1;
                 use InternetSlice::*;
                 use TransportSlice::*;
@@ -144,6 +158,7 @@ fn read(in_file_path: &str, in_file_metadata: Metadata, result_writer: &mut Writ
     println!("{:?}", duration);
     println!("{:?}GB/s (file)", gigabytes_per_sec_file);
     println!("{:?}GB/s (packets data)", gigabytes_per_sec_packets);
+    println!("{:?} (matching filter)", filter_matching);
 
     result_writer.serialize(ResultStats {
         path: in_file_path,

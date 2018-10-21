@@ -11,6 +11,17 @@ fn main() {
                   .timeout(20)
                   .promisc(true)
                   .open().unwrap();
+
+    let filter = Filter {
+        link: ElementFilter::Any,
+        vlan: ElementFilter::No,
+        ip: ElementFilter::Some(IpFilter::Ipv4{
+            source: Some([192,168,1,141]),
+            destination: None
+        }),
+        transport: ElementFilter::Any, //<TransportFilter>
+    };
+
     loop {
         while let Ok(packet) = cap.next() {
 
@@ -19,6 +30,11 @@ fn main() {
             match sliced {
                 Err(value) => println!("Err {:?}", value),
                 Ok(value) => {
+
+                    if !filter.applies_to_slice(&value) {
+                        continue;
+                    }
+
                     println!("Ok");
                     use LinkSlice::*;
                     use InternetSlice::*;

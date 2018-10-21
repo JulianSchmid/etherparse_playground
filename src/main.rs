@@ -530,10 +530,12 @@ fn main() {
         tcp.cwr = true;
 
         use TcpOptionElement::*;
-        tcp.set_options(&[
-            Nop, Nop, Nop, Nop,
-            Timestamp(0x4161008, 0x84161708)
-        ]).unwrap();
+        tcp.set_options(&[MaximumSegmentSize(1400), // 4
+                             SelectiveAcknowledgementPermitted, // 2
+                             Timestamp(2661445915, 0), // 10
+                             Nop, // 1
+                             WindowScale(7),
+                             Nop]).unwrap();
 
         let ip_header = Ipv6Header {
             traffic_class: 1,
