@@ -33,7 +33,7 @@ required-features = ["listen"]
 [dependencies]
 rpcap = "0.3.0"
 byteorder = "1.2.7"
-etherparse = "0.7.0"
+etherparse = "0.7.1"
 time = "0.1.40"
 clap = "2.32.0"
 csv = "1.0.2"
