@@ -28,10 +28,10 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
 
                     stats.ok += 1;
                     match value.ip {
-                        Some(Version4(_value)) => {
+                        Some(Version4(_value, _)) => {
                             stats.ipv4 += 1;
                         },
-                        Some(Version6(_value)) => {
+                        Some(Version6(_value, _)) => {
                             stats.ipv6 += 1;
                         },
                         None => {
@@ -49,7 +49,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                             for option in tcp.options_iterator() {
                                 match option {
                                     Err(_) => stats.tcp_options_err += 1,
-                                    Ok(Nop) => stats.tcp_options_nop += 1,
+                                    Ok(Noop) => stats.tcp_options_noop += 1,
                                     Ok(MaximumSegmentSize(_)) => stats.tcp_options_max_seg += 1,
                                     Ok(WindowScale(_)) => stats.tcp_options_window_scale += 1,
                                     Ok(SelectiveAcknowledgementPermitted) => stats.tcp_options_selec_ack_perm += 1,

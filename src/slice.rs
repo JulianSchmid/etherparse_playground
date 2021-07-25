@@ -14,16 +14,19 @@ use clap::{Arg, App};
 fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),Error> {
 
     let mut recorder = StatsRecorder::new(in_file_path);
+    //let mut dummy_sum: usize = 0;
     {
         let stats = &mut recorder.stats;
-        let mut reader = rpcap::read::PcapReader::new(BufReader::new(File::open(&in_file_path)?))?;
+        let mut reader = rpcap::read::PcapReader::new(BufReader::with_capacity(1024*100, File::open(&in_file_path)?))?;
         while let Some(packet) = reader.next()? {
+            //dummy_sum += packet.data[packet.data.len() - 1] as usize;
             stats.total_payload_size += packet.data.len();
 
             let sliced = SlicedPacket::from_ethernet(&packet.data);
 
             match sliced {
                 Err(_) => {
+                    //println!("Error: {}", err);
                     stats.err += 1;
                 },
                 Ok(value) => {
@@ -32,7 +35,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                     use TransportSlice::*;
 
                     match &value.ip {
-                        Some(Ipv4(_)) => {
+                        Some(Ipv4(_, _)) => {
                             stats.ipv4 += 1;
                         },
                         Some(Ipv6(_,_)) => {
@@ -54,7 +57,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                                 use TcpOptionElement::*;
                                 match option {
                                     Err(_) => stats.tcp_options_err += 1,
-                                    Ok(Nop) => stats.tcp_options_nop += 1,
+                                    Ok(Noop) => stats.tcp_options_noop += 1,
                                     Ok(MaximumSegmentSize(_)) => stats.tcp_options_max_seg += 1,
                                     Ok(WindowScale(_)) => stats.tcp_options_window_scale += 1,
                                     Ok(SelectiveAcknowledgementPermitted) => stats.tcp_options_selec_ack_perm += 1,
@@ -62,6 +65,9 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                                     Ok(Timestamp(_, _)) => stats.tcp_options_timestamp += 1
                                 }
                             }
+                        },
+                        Some(Unknown(_)) => {
+                            stats.transport_unknown += 1;
                         },
                         None => {
                             if value.ip.is_some() {
@@ -74,6 +80,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
         }
     }
     result_writer.serialize(recorder.end()).unwrap();
+    //println!("{}", dummy_sum);
     Ok(())
 }
 

@@ -1,8 +1,26 @@
 extern crate etherparse;
 use etherparse::*;
-use etherparse::packet_filter::*;
 
 extern crate pcap;
+
+struct Mac {
+    addr: [u8;6]
+}
+impl std::fmt::Display for Mac {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+            self.addr[0],
+            self.addr[1],
+            self.addr[2],
+            self.addr[3],
+            self.addr[4],
+            self.addr[5],
+        )
+    }
+}
+
 
 fn main() {
     for device in pcap::Device::list().unwrap() {
@@ -14,16 +32,6 @@ fn main() {
                   .promisc(true)
                   .open().unwrap();
 
-    let filter = Filter {
-        link: ElementFilter::Any,
-        vlan: ElementFilter::No,
-        ip: ElementFilter::Some(IpFilter::Ipv4{
-            source: Some([192,168,1,141]),
-            destination: None
-        }),
-        transport: ElementFilter::Any, //<TransportFilter>
-    };
-
     loop {
         while let Ok(packet) = cap.next() {
 
@@ -33,10 +41,6 @@ fn main() {
                 Err(value) => println!("Err {:?}", value),
                 Ok(value) => {
 
-                    if !filter.applies_to_slice(&value) {
-                        //continue;
-                    }
-
                     println!("Ok");
                     use LinkSlice::*;
                     use InternetSlice::*;
@@ -44,7 +48,7 @@ fn main() {
                     use VlanSlice::*;
 
                     match value.link {
-                        Some(Ethernet2(value)) => println!("  Ethernet2 {:?} => {:?}", value.source(), value.destination()),
+                        Some(Ethernet2(value)) => println!("  Ethernet2 {} => {}", Mac{ addr: value.source()}, Mac{ addr: value.destination()}),
                         None => {}
                     }
 
@@ -55,7 +59,7 @@ fn main() {
                     }
 
                     match value.ip {
-                        Some(Ipv4(value)) => println!("  Ipv4 {:?} => {:?}", value.source_addr(), value.destination_addr()),
+                        Some(Ipv4(value, _)) => println!("  Ipv4 {:?} => {:?}", value.source_addr(), value.destination_addr()),
                         Some(Ipv6(value, _)) => println!("  Ipv6 {:?} => {:?}", value.source_addr(), value.destination_addr()),
                         None => {}
                     }
@@ -64,74 +68,17 @@ fn main() {
                         Some(Udp(value)) => println!("  UDP {:?} -> {:?}", value.source_port(), value.destination_port()),
                         Some(Tcp(value)) => {
                             println!("  TCP {:?} -> {:?}", value.source_port(), value.destination_port());
-                            let options: Vec<Result<TcpOptionElement, TcpOptionReadError>> = value.options_iterator().collect();
-                            println!("    {:?}", options);
-                        }
-                        None => {}
-                    }
-                }
-            }
-            /*
-            match SlicedPacket::from_ethernet(&packet) {
-                Err(value) => println!("Err {:?}", value),
-                Ok(value) => {
-                    println!("link: {:?}", value.link);
-                    println!("vlan: {:?}", value.vlan);
-                    println!("ip: {:?}", value.ip);
-                    println!("transport: {:?}", value.transport);
-                }
-            }
-
-            match PacketHeaders::from_ethernet_slice(&packet) {
-                Err(value) => println!("Err {:?}", value),
-                Ok(value) => {
-                    println!("link: {:?}", value.link);
-                    println!("vlan: {:?}", value.vlan);
-                    println!("ip: {:?}", value.ip);
-                    println!("transport: {:?}", value.transport);
-                }
-            }*/
-
-            /*let decoded = PacketHeaders::decode(&packet);
-            use IpHeader::*;
-            use std::net::{Ipv4Addr, Ipv6Addr};
-            match decoded {
-                Ok(value) => {
-                    match value.ethernet {
-                        Some(value) => {
-                            match EtherType::from_u16(value.ether_type) {
-                                Some(ether_type) => println!("EthernetII({:?}) {:?} => {:?}", ether_type, value.source, value.destination),
-                                None => println!("EthernetII({:?}) {:?} => {:?}", value.ether_type, value.source, value.destination)
+                            if value.options().len() > 0 {
+                                println!("    TCP Options: {:?}",value.options_iterator());
                             }
-                            
-                        },
+                        }
+                        Some(Unknown(_)) => println!("  Unknown"),
                         None => {}
                     }
-                    match value.vlan {
-                        Some(value) => {
-                            println!("{:?}", value)
-                        },
-                        None => {}
-                    }
-                    match value.ip {
-                        Some(Version4(value)) => {
-                            println!("IPv4 {:?} => {:?}", Ipv4Addr::from(value.source), Ipv4Addr::from(value.destination));
-                        },
-                        Some(Version6(value)) => {
-                            println!("IPv6 {:?} => {:?}", Ipv6Addr::from(value.source), Ipv6Addr::from(value.destination));
-                        },
-                        _ => {}
-                    }
-                    match value.transport {
-                        Some(value) => {
-                            println!("UDP {:?} => {:?}", value.source_port, value.destination_port);
-                        },
-                        None => {}
-                    }
-                },
-                value => println!("{:?}", value)
+
+                    println!("  {} bytes payload", value.payload.len());
+                }
             }
-            println!("");*/
         }
     }
 }

@@ -7,7 +7,7 @@ use self::rpcap::write::{PcapWriter, WriteOptions};
 extern crate etherparse;
 use self::etherparse::*;
 use self::etherparse::EtherType::*;
-use self::etherparse::IpTrafficClass;
+use self::etherparse::IpNumber;
 use std::time::SystemTime;
 
 extern crate byteorder;
@@ -65,8 +65,8 @@ fn main() {
             drop_eligible_indicator: true,
             vlan_identifier: 1234,
         }.write(&mut payload).unwrap();
-        let ip_header = Ipv4Header::new(2*4 + 16, 4, IpTrafficClass::Udp, [192, 168, 1, 1], [212, 10, 11, 123]).unwrap();
-        ip_header.write(&mut payload, &[]).unwrap();
+        let ip_header = Ipv4Header::new(2*4 + 16, 4, IpNumber::Udp, [192, 168, 1, 1], [212, 10, 11, 123]);
+        ip_header.write(&mut payload).unwrap();
         let udp_payload: [u8; 17] = [2;17]; 
         UdpHeader::with_ipv4_checksum(1234, 5678, &ip_header, &udp_payload).unwrap().write(&mut payload).unwrap();
         payload.write(&udp_payload).unwrap();
@@ -88,7 +88,7 @@ fn main() {
             traffic_class: 1,
             flow_label: 0x81806,
             payload_length: (UdpHeader::SERIALIZED_SIZE + udp_payload.len()) as u16,
-            next_header: IpTrafficClass::Udp as u8,
+            next_header: IpNumber::Udp as u8,
             hop_limit: 40,
             source: [1, 2, 3, 4, 5, 6, 7, 8,
                      9,10,11,12,13,14,15,16],
@@ -119,18 +119,18 @@ fn main() {
         //Note: It is also possible to define the rest of the header values via Ipv4Header {...}
         let ip_header = Ipv4Header::new(
             //size of the payload
-            UdpHeader::SERIALIZED_SIZE + udp_payload.len(),
+            (UdpHeader::SERIALIZED_SIZE + udp_payload.len()) as u16,
             //time to live
             20,
             //contained protocol is udp
-            IpTrafficClass::Udp,
+            IpNumber::Udp,
             //source ip address
             [192,168,1,42],
             //destination ip address
             [192,168,1,1]
-        ).unwrap();
+        );
 
-        ip_header.write(&mut packet, &[]).unwrap();
+        ip_header.write(&mut packet).unwrap();
 
         //write the udp header
         UdpHeader::with_ipv4_checksum(
@@ -162,17 +162,17 @@ fn main() {
         }.write(&mut packet).unwrap();
 
         let mut payload = [0,0,0,0];
-        let sum: u16 = IpTrafficClass::Udp as u16 +
+        let sum: u16 = IpNumber::Udp as u16 +
                         (2*(UdpHeader::SERIALIZED_SIZE as u16 + 
                             payload.len() as u16));
         BigEndian::write_u16(&mut payload, 0xffff - sum);
         let ip_header = Ipv4Header::new(
-            UdpHeader::SERIALIZED_SIZE + payload.len(), 
+            (UdpHeader::SERIALIZED_SIZE + payload.len()) as u16, 
             5, 
-            IpTrafficClass::Udp, 
+            IpNumber::Udp, 
             [0,0,0,0],
-            [0,0,0,0]).unwrap();
-        ip_header.write(&mut packet, &[]).unwrap();
+            [0,0,0,0]);
+        ip_header.write(&mut packet).unwrap();
 
         UdpHeader::with_ipv4_checksum(0, 0, &ip_header, &payload).unwrap().write(&mut packet).unwrap();
         packet.write_all(&payload).unwrap();
@@ -202,7 +202,7 @@ fn main() {
             traffic_class: 1,
             flow_label: 0x81806,
             payload_length: (UdpHeader::SERIALIZED_SIZE + udp_payload.len()) as u16,
-            next_header: IpTrafficClass::Udp as u8,
+            next_header: IpNumber::Udp as u8,
             hop_limit: 40,
             source: [0xff;16],
             destination: [0xff;16]
@@ -257,7 +257,7 @@ fn main() {
 
         use TcpOptionElement::*;
         tcp.set_options(&[
-            Nop, Nop, Nop, Nop,
+            Noop, Noop, Noop, Noop,
             Timestamp(0x4161008, 0x84161708)
         ]).unwrap();
         //tcp.set_options_raw(&[0,0]).unwrap();
@@ -266,18 +266,18 @@ fn main() {
         //Note: It is also possible to define the rest of the header values via Ipv4Header {...}
         let ip_header = Ipv4Header::new(
             //size of the payload
-            tcp.header_len() as usize + tcp_payload.len(),
+            (tcp.header_len() as usize + tcp_payload.len()) as u16,
             //time to live
             20,
             //contained protocol is udp
-            IpTrafficClass::Tcp,
+            IpNumber::Tcp,
             //source ip address
             [192,168,1,42],
             //destination ip address
             [192,168,1,1]
-        ).unwrap();
+        );
 
-        ip_header.write(&mut packet, &[]).unwrap();
+        ip_header.write(&mut packet).unwrap();
 
         tcp.checksum = tcp.calc_checksum_ipv4(&ip_header, &tcp_payload).unwrap();
 
@@ -325,7 +325,7 @@ fn main() {
 
         use TcpOptionElement::*;
         tcp.set_options(&[
-            Nop, Nop, Nop, Nop,
+            Noop, Noop, Noop, Noop,
             Timestamp(0x4161008, 0x84161708)
         ]).unwrap();
         //tcp.set_options_raw(&[0;8]).unwrap();
@@ -334,18 +334,18 @@ fn main() {
         //Note: It is also possible to define the rest of the header values via Ipv4Header {...}
         let ip_header = Ipv4Header::new(
             //size of the payload
-            tcp.header_len() as usize + tcp_payload.len(),
+            tcp.header_len() + (tcp_payload.len() as u16),
             //time to live
             3,
             //contained protocol is udp
-            IpTrafficClass::Tcp,
+            IpNumber::Tcp,
             //source ip address
             [251,252,253,254],
             //destination ip address
             [246,248,247,249]
-        ).unwrap();
+        );
 
-        ip_header.write(&mut packet, &[]).unwrap();
+        ip_header.write(&mut packet).unwrap();
 
         //update tcp checksum & write out
         tcp.checksum = tcp.calc_checksum_ipv4(&ip_header, &tcp_payload).unwrap();
@@ -393,7 +393,7 @@ fn main() {
 
         /*use TcpOptionElement::*;
         tcp.set_options(&[
-            Nop, Nop, Nop, Nop,
+            Noop, Noop, Noop, Noop,
             Timestamp(0x4161008, 0x84161708)
         ]).unwrap();*/
         //tcp.set_options_raw(&[0;8]).unwrap();
@@ -402,18 +402,18 @@ fn main() {
         //Note: It is also possible to define the rest of the header values via Ipv4Header {...}
         let ip_header = Ipv4Header::new(
             //size of the payload
-            tcp.header_len() as usize + tcp_payload.len(),
+            tcp.header_len() + (tcp_payload.len() as u16),
             //time to live
             0,
             //contained protocol is udp
-            IpTrafficClass::Tcp,
+            IpNumber::Tcp,
             //source ip address
             [0;4],
             //destination ip address
             [0;4]
-        ).unwrap();
+        );
 
-        ip_header.write(&mut packet, &[]).unwrap();
+        ip_header.write(&mut packet).unwrap();
 
         //update tcp checksum & write out
         tcp.checksum = tcp.calc_checksum_ipv4(&ip_header, &tcp_payload).unwrap();
@@ -463,7 +463,7 @@ fn main() {
 
         /*use TcpOptionElement::*;
         tcp.set_options(&[
-            Nop, Nop, Nop, Nop,
+            Noop, Noop, Noop, Noop,
             Timestamp(0x4161008, 0x84161708)
         ]).unwrap();*/
         //tcp.set_options_raw(&[0;8]).unwrap();
@@ -472,18 +472,18 @@ fn main() {
         //Note: It is also possible to define the rest of the header values via Ipv4Header {...}
         let ip_header = Ipv4Header::new(
             //size of the payload
-            tcp.header_len() as usize + tcp_payload.len(),
+            tcp.header_len() + (tcp_payload.len() as u16),
             //time to live
             0,
             //contained protocol is udp
-            IpTrafficClass::Tcp,
+            IpNumber::Tcp,
             //source ip address
             [0;4],
             //destination ip address
             [0;4]
-        ).unwrap();
+        );
 
-        ip_header.write(&mut packet, &[]).unwrap();
+        ip_header.write(&mut packet).unwrap();
 
         //update tcp checksum & write out
         tcp.checksum = tcp.calc_checksum_ipv4(&ip_header, &tcp_payload).unwrap();
@@ -533,15 +533,15 @@ fn main() {
         tcp.set_options(&[MaximumSegmentSize(1400), // 4
                              SelectiveAcknowledgementPermitted, // 2
                              Timestamp(2661445915, 0), // 10
-                             Nop, // 1
+                             Noop, // 1
                              WindowScale(7),
-                             Nop]).unwrap();
+                             Noop]).unwrap();
 
         let ip_header = Ipv6Header {
             traffic_class: 1,
             flow_label: 0x81806,
             payload_length: tcp_payload.len() as u16 + tcp.header_len(),
-            next_header: IpTrafficClass::Tcp as u8,
+            next_header: IpNumber::Tcp as u8,
             hop_limit: 40,
             source: [1,2,3,4,5,6,7,8,
                      9,10,11,12,13,14,15,16],
