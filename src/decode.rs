@@ -16,7 +16,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
     let mut recorder = StatsRecorder::new(in_file_path);
     {
         let stats = &mut recorder.stats;
-        let mut reader = rpcap::read::PcapReader::new(BufReader::new(File::open(&in_file_path)?))?;
+        let (_, mut reader) = rpcap::read::PcapReader::new(BufReader::with_capacity(1024*100, File::open(&in_file_path)?))?;
 
         while let Some(packet) = reader.next()? {            
             stats.total_payload_size += packet.data.len();
@@ -58,6 +58,12 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                                 }
                             }
                         },
+                        Some(Icmpv4(_)) => {
+                            stats.icmpv4 += 1;
+                        },
+                        Some(Icmpv6(_)) => {
+                            stats.icmpv6 += 1;
+                        }
                         None => {
                             stats.ip_payload += 1;
                         }

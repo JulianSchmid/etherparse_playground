@@ -72,6 +72,12 @@ fn main() {
                                 println!("    TCP Options: {:?}",value.options_iterator());
                             }
                         }
+                        Some(Icmpv4(icmpv4)) => {
+                            println!("  Icmp4 {:?}", icmpv4.icmp_type());
+                        },
+                        Some(Icmpv6(icmpv6)) => {
+                            println!("  Icmp6 {:?}", icmpv6.header());
+                        },
                         Some(Unknown(_)) => println!("  Unknown"),
                         None => {}
                     }

@@ -6,11 +6,11 @@ extern crate clap;
 use clap::{Arg, App};
 
 #[derive(Debug, Default, Clone)]
-struct Stats {
-    average: Option<f64>,
-    standard_deviation: Option<f64>,
-    sum: f64,
-    count: usize
+pub struct Stats {
+    pub average: Option<f64>,
+    pub standard_deviation: Option<f64>,
+    pub sum: f64,
+    pub count: usize
 }
 
 impl Stats {

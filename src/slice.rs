@@ -1,15 +1,8 @@
 use std::io::BufReader;
 use std::fs::File;
-extern crate etherparse_playground;
-use self::etherparse_playground::*;
-extern crate rpcap;
-extern crate etherparse;
-use self::etherparse::*;
-extern crate glob;
-extern crate csv;
-#[macro_use]
-extern crate clap;
-use clap::{Arg, App};
+use etherparse_playground::*;
+use etherparse::*;
+use clap::{Arg, App, value_t_or_exit};
 
 fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),Error> {
 
@@ -17,7 +10,7 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
     //let mut dummy_sum: usize = 0;
     {
         let stats = &mut recorder.stats;
-        let mut reader = rpcap::read::PcapReader::new(BufReader::with_capacity(1024*100, File::open(&in_file_path)?))?;
+        let (_, mut reader) = rpcap::read::PcapReader::new(BufReader::with_capacity(1024*100, File::open(&in_file_path)?))?;
         while let Some(packet) = reader.next()? {
             //dummy_sum += packet.data[packet.data.len() - 1] as usize;
             stats.total_payload_size += packet.data.len();
@@ -66,6 +59,12 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                                 }
                             }
                         },
+                        Some(Icmpv4(_)) => {
+                            stats.icmpv4 += 1;
+                        }
+                        Some(Icmpv6(_)) => {
+                            stats.icmpv6 += 1;
+                        }
                         Some(Unknown(_)) => {
                             stats.transport_unknown += 1;
                         },

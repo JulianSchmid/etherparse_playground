@@ -1,9 +1,9 @@
 use std::io::{BufReader, BufWriter, Write};
 use std::fs::File;
 extern crate rpcap;
-use self::rpcap::CapturedPacket;
+use self::rpcap::{CapturedPacket, FileOptions};
 use self::rpcap::read::PcapReader;
-use self::rpcap::write::{PcapWriter, WriteOptions};
+use self::rpcap::write::PcapWriter;
 extern crate etherparse;
 use self::etherparse::*;
 use self::etherparse::EtherType::*;
@@ -33,12 +33,12 @@ fn main() {
                       .get_matches();
 
     // read a PCAP file
-    let mut pcapr = PcapReader::new(BufReader::new(File::open(matches.value_of("INPUT").unwrap()).unwrap())).unwrap();
-    println!("linktype: {}", pcapr.get_linktype());
-    println!("snaplen: {}", pcapr.get_snaplen());
+    let (pcap_options, mut pcap_reader) = PcapReader::new(BufReader::new(File::open(matches.value_of("INPUT").unwrap()).unwrap())).unwrap();
+    println!("linktype: {}", pcap_options.linktype);
+    println!("snaplen: {}", pcap_options.snaplen);
 
     // copy all packets from example.pcap to copy.pcap
-    while let Some(_packet) = pcapr.next().unwrap() {
+    while let Some(_packet) = pcap_reader.next().unwrap() {
         /*println!("packet at {:?} with size {} (cropped from {})",
             packet.time, packet.data.len(), packet.orig_len);
         let mut cursor = Cursor::new(&packet.data);
@@ -48,10 +48,15 @@ fn main() {
 
     let outfile = File::create(matches.value_of("OUTPUT").unwrap()).unwrap();
     let writer = BufWriter::new(outfile);
-    let mut pcapw = PcapWriter::new(writer, WriteOptions {
-        snaplen: 0xfffff,
-        linktype: pcapr.get_linktype(),
-    }).unwrap();
+    let mut pcapw = PcapWriter::new(
+        writer,
+        FileOptions {
+            snaplen: 0xfffff,
+            linktype: pcap_options.linktype,
+            high_res_timestamps: pcap_options.high_res_timestamps,
+            non_native_byte_order: pcap_options.non_native_byte_order
+        }
+    ).unwrap();
     {
         let mut payload = Vec::new();
         Ethernet2Header {
@@ -65,7 +70,7 @@ fn main() {
             drop_eligible_indicator: true,
             vlan_identifier: 1234,
         }.write(&mut payload).unwrap();
-        let ip_header = Ipv4Header::new(2*4 + 16, 4, IpNumber::Udp, [192, 168, 1, 1], [212, 10, 11, 123]);
+        let ip_header = Ipv4Header::new(2*4 + 16, 4, ip_number::UDP, [192, 168, 1, 1], [212, 10, 11, 123]);
         ip_header.write(&mut payload).unwrap();
         let udp_payload: [u8; 17] = [2;17]; 
         UdpHeader::with_ipv4_checksum(1234, 5678, &ip_header, &udp_payload).unwrap().write(&mut payload).unwrap();
@@ -123,7 +128,7 @@ fn main() {
             //time to live
             20,
             //contained protocol is udp
-            IpNumber::Udp,
+            ip_number::UDP,
             //source ip address
             [192,168,1,42],
             //destination ip address
@@ -169,7 +174,7 @@ fn main() {
         let ip_header = Ipv4Header::new(
             (UdpHeader::SERIALIZED_SIZE + payload.len()) as u16, 
             5, 
-            IpNumber::Udp, 
+            ip_number::UDP, 
             [0,0,0,0],
             [0,0,0,0]);
         ip_header.write(&mut packet).unwrap();
@@ -270,7 +275,7 @@ fn main() {
             //time to live
             20,
             //contained protocol is udp
-            IpNumber::Tcp,
+            ip_number::TCP,
             //source ip address
             [192,168,1,42],
             //destination ip address
@@ -338,7 +343,7 @@ fn main() {
             //time to live
             3,
             //contained protocol is udp
-            IpNumber::Tcp,
+            ip_number::TCP,
             //source ip address
             [251,252,253,254],
             //destination ip address
@@ -406,7 +411,7 @@ fn main() {
             //time to live
             0,
             //contained protocol is udp
-            IpNumber::Tcp,
+            ip_number::TCP,
             //source ip address
             [0;4],
             //destination ip address
@@ -476,7 +481,7 @@ fn main() {
             //time to live
             0,
             //contained protocol is udp
-            IpNumber::Tcp,
+            ip_number::TCP,
             //source ip address
             [0;4],
             //destination ip address

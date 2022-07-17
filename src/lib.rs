@@ -22,7 +22,9 @@ pub struct Stats {
     pub tcp_options_window_scale: usize,
     pub tcp_options_selec_ack_perm: usize,
     pub tcp_options_selec_ack: usize,
-    pub tcp_options_timestamp: usize
+    pub tcp_options_timestamp: usize,
+    pub icmpv4: usize,
+    pub icmpv6: usize,
 }
 
 pub struct StatsRecorder<'a> {

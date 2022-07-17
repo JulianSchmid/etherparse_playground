@@ -1,4 +1,3 @@
-use std::io::BufReader;
 use std::fs::File;
 extern crate etherparse_playground;
 use self::etherparse_playground::*;
@@ -95,6 +94,12 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                                             Ok(Timestamp(_, _)) => stats.tcp_options_timestamp += 1
                                         }
                                     }
+                                },
+                                Some(Icmpv4(_)) => {
+                                    stats.icmpv4 += 1;
+                                },
+                                Some(Icmpv6(_)) => {
+                                    stats.icmpv6 += 1;
                                 },
                                 Some(Unknown(_)) => {
                                     stats.transport_unknown += 1;
