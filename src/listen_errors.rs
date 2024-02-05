@@ -27,13 +27,13 @@ fn main() {
         println!("{:?}", device);
     }
     println!("default: {:?}", pcap::Device::lookup());
-    let mut cap = pcap::Capture::from_device(pcap::Device::lookup().unwrap()).unwrap()
+    let mut cap = pcap::Capture::from_device(pcap::Device::lookup().unwrap().unwrap()).unwrap()
                   .timeout(20)
                   .promisc(true)
                   .open().unwrap();
 
     loop {
-        while let Ok(packet) = cap.next() {
+        while let Ok(packet) = cap.next_packet() {
 
             let sliced = SlicedPacket::from_ethernet(&packet);
 

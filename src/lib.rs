@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate serde_derive;
-extern crate rpcap;
-extern crate time;
-use time::PreciseTime;
+use std::time::Instant;
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct Stats {
@@ -28,7 +26,7 @@ pub struct Stats {
 }
 
 pub struct StatsRecorder<'a> {
-    start: time::PreciseTime,
+    start: Instant,
     pub stats: Stats,
     path: &'a str,
     file_size: u64
@@ -38,7 +36,7 @@ impl<'a> StatsRecorder<'a> {
     pub fn new(file_path: &'a str) -> StatsRecorder<'a> {
         let file_meta = std::fs::metadata(file_path).unwrap();
         StatsRecorder {
-            start: PreciseTime::now(),
+            start: Instant::now(),
             stats: Default::default(),
             path: file_path,
             file_size: file_meta.len()
@@ -46,7 +44,7 @@ impl<'a> StatsRecorder<'a> {
     }
 
     pub fn end(self) -> ResultStats<'a> {
-        let duration = self.start.to(PreciseTime::now()).to_std().unwrap();
+        let duration = self.start.elapsed();
         let duration_secs = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let gigabytes_per_sec_file = self.file_size as f64 / duration_secs /  1_000_000_000.0;
         let gigabytes_per_sec_packets = self.stats.total_payload_size as f64 / duration_secs / 1_000_000_000.0;

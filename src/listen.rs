@@ -1,7 +1,4 @@
-extern crate etherparse;
 use etherparse::*;
-
-extern crate pcap;
 
 struct Mac {
     addr: [u8;6]
@@ -27,13 +24,13 @@ fn main() {
         println!("{:?}", device);
     }
     println!("default: {:?}", pcap::Device::lookup());
-    let mut cap = pcap::Capture::from_device(pcap::Device::lookup().unwrap()).unwrap()
-                  .timeout(20)
-                  .promisc(true)
-                  .open().unwrap();
+    let mut cap = pcap::Capture::from_device(pcap::Device::lookup().unwrap().unwrap()).unwrap()
+                  .immediate_mode(true)
+                  .open()
+                  .unwrap();
 
     loop {
-        while let Ok(packet) = cap.next() {
+        while let Ok(packet) = cap.next_packet() {
 
             let sliced = SlicedPacket::from_ethernet(&packet);
 
@@ -43,12 +40,13 @@ fn main() {
 
                     println!("Ok");
                     use LinkSlice::*;
-                    use InternetSlice::*;
+                    use NetSlice::*;
                     use TransportSlice::*;
                     use VlanSlice::*;
 
                     match value.link {
                         Some(Ethernet2(value)) => println!("  Ethernet2 {} => {}", Mac{ addr: value.source()}, Mac{ addr: value.destination()}),
+                        Some(EtherPayload(e)) => println!("  EtherPayload {:?}", e.ether_type),
                         None => {}
                     }
 
@@ -58,9 +56,9 @@ fn main() {
                         None => {}
                     }
 
-                    match value.ip {
-                        Some(Ipv4(value, _)) => println!("  Ipv4 {:?} => {:?}", value.source_addr(), value.destination_addr()),
-                        Some(Ipv6(value, _)) => println!("  Ipv6 {:?} => {:?}", value.source_addr(), value.destination_addr()),
+                    match value.net {
+                        Some(Ipv4(ipv4)) => println!("  Ipv4 {:?} => {:?}", ipv4.header().source_addr(), ipv4.header().destination_addr()),
+                        Some(Ipv6(ipv6)) => println!("  Ipv6 {:?} => {:?}", ipv6.header().source_addr(), ipv6.header().destination_addr()),
                         None => {}
                     }
 
@@ -78,11 +76,8 @@ fn main() {
                         Some(Icmpv6(icmpv6)) => {
                             println!("  Icmp6 {:?}", icmpv6.header());
                         },
-                        Some(Unknown(_)) => println!("  Unknown"),
                         None => {}
                     }
-
-                    println!("  {} bytes payload", value.payload.len());
                 }
             }
         }

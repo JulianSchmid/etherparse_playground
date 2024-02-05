@@ -1,15 +1,9 @@
 use std::io::BufReader;
 use std::fs::File;
-extern crate etherparse_playground;
-use self::etherparse_playground::*;
-extern crate rpcap;
-extern crate etherparse;
-use self::etherparse::*;
-extern crate glob;
-extern crate csv;
-#[macro_use]
-extern crate clap;
-use clap::{Arg, App};
+use std::path::PathBuf;
+use etherparse_playground::*;
+use etherparse::*;
+use clap::Parser;
 
 fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),Error> {
     
@@ -23,15 +17,15 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
 
             match PacketHeaders::from_ethernet_slice(&packet.data) {
                 Ok(value) => {
-                    use IpHeader::*;
+                    use NetHeaders::*;
                     use TransportHeader::*;
 
                     stats.ok += 1;
-                    match value.ip {
-                        Some(Version4(_value, _)) => {
+                    match value.net {
+                        Some(Ipv4(_value, _)) => {
                             stats.ipv4 += 1;
                         },
-                        Some(Version6(_value, _)) => {
+                        Some(Ipv6(_value, _)) => {
                             stats.ipv6 += 1;
                         },
                         None => {
@@ -79,34 +73,29 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
     Ok(())
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = "Slices all packages of a or multiple pcap(s) to measure performance")]
+struct Args {
+    /// Input PCAP file or files (can be a glob expression)
+    input: String,
+
+    /// Resulting CSV
+    result_csv: PathBuf,
+
+    /// Number of times to greet
+    #[arg(short, long, default_value_t = 1)]
+    number_of_reads: usize,
+}
+
 fn main() {
-    let matches = App::new("decodes all packages of a or multiple pcap(s) to measure performance")
-                      .author("Julian Schmid")
-                          .arg(Arg::with_name("INPUT")
-                               .help("input pcap file or files (can be a glob expression)")
-                               .required(true)
-                               .index(1))
-                          .arg(Arg::with_name("number_of_reads")
-                            .takes_value(true)
-                            .help("the number of times each file is read")
-                            .short("n")
-                            .long("number_of_reads"))
-                          .arg(Arg::with_name("csv")
-                            .takes_value(true)
-                            .required(true)
-                            .short("c")
-                            .long("csv"))
-                      .get_matches();
+    let args = Args::parse();
+    let mut out_file = csv::Writer::from_path(args.result_csv).unwrap();
 
-    let number_of_reads = value_t_or_exit!(matches, "number_of_reads", usize);
-
-    let mut out_file = csv::Writer::from_path(&matches.value_of("csv").unwrap()).unwrap();
-
-    for entry in glob::glob(&matches.value_of("INPUT").unwrap()).expect("Failed to read glob pattern") {
+    for entry in glob::glob(&args.input).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let path_str = path.to_str().unwrap();
-                for _i in 0..number_of_reads {
+                for _i in 0..args.number_of_reads {
                     match read(&path_str, &mut out_file) {
                         Ok(_) => {},
                         Err(err) => println!("{:?}", err)

@@ -1,8 +1,8 @@
-use std::io::BufReader;
+use std::{io::BufReader, path::PathBuf};
 use std::fs::File;
 use etherparse_playground::*;
 use etherparse::*;
-use clap::{Arg, App, value_t_or_exit};
+use clap::Parser;
 
 fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),Error> {
 
@@ -24,14 +24,14 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                 },
                 Ok(value) => {
                     stats.ok += 1;
-                    use InternetSlice::*;
+                    use NetSlice::*;
                     use TransportSlice::*;
 
-                    match &value.ip {
-                        Some(Ipv4(_, _)) => {
+                    match &value.net {
+                        Some(Ipv4(_)) => {
                             stats.ipv4 += 1;
                         },
-                        Some(Ipv6(_,_)) => {
+                        Some(Ipv6(_)) => {
                             stats.ipv6 += 1;
                         },
                         None => {
@@ -65,11 +65,8 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
                         Some(Icmpv6(_)) => {
                             stats.icmpv6 += 1;
                         }
-                        Some(Unknown(_)) => {
-                            stats.transport_unknown += 1;
-                        },
                         None => {
-                            if value.ip.is_some() {
+                            if value.net.is_some() {
                                 stats.ip_payload += 1;
                             }
                         }
@@ -83,35 +80,30 @@ fn read(in_file_path: &str, result_writer: &mut csv::Writer<File>) -> Result<(),
     Ok(())
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = "Slices all packages of a or multiple pcap(s) to measure performance")]
+struct Args {
+    /// Input PCAP file or files (can be a glob expression)
+    input: String,
+
+    /// Resulting CSV
+    result_csv: PathBuf,
+
+    /// Number of times to greet
+    #[arg(short, long, default_value_t = 1)]
+    number_of_reads: usize,
+}
+
 fn main() {
 
-    let matches = App::new("slices all packages of a or multiple pcap(s) to measure performance")
-                      .author("Julian Schmid")
-                          .arg(Arg::with_name("INPUT")
-                               .help("input pcap file or files (can be a glob expression)")
-                               .required(true)
-                               .index(1))
-                          .arg(Arg::with_name("number_of_reads")
-                            .takes_value(true)
-                            .help("the number of times each file is read")
-                            .short("n")
-                            .long("number_of_reads"))
-                          .arg(Arg::with_name("csv")
-                            .takes_value(true)
-                            .required(true)
-                            .short("c")
-                            .long("csv"))
-                      .get_matches();
+    let args = Args::parse();
+    let mut out_file = csv::Writer::from_path(args.result_csv).unwrap();
 
-    let number_of_reads = value_t_or_exit!(matches, "number_of_reads", usize);
-
-    let mut out_file = csv::Writer::from_path(&matches.value_of("csv").unwrap()).unwrap();
-
-    for entry in glob::glob(&matches.value_of("INPUT").unwrap()).expect("Failed to read glob pattern") {
+    for entry in glob::glob(&args.input).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let path_str = path.to_str().unwrap();
-                for _i in 0..number_of_reads {
+                for _i in 0..args.number_of_reads {
                     match read(&path_str, &mut out_file) {
                         Ok(_) => {},
                         Err(err) => println!("{:?}", err)
